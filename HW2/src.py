@@ -324,25 +324,58 @@ class MyNetwork:
           learning_rate : float
               Learning rate for updating the weights.
         """
-        samples = len(x_train)
-        for i in range(epochs):
-            indices = np.arange(samples)
-            np.random.shuffle(indices)
-            for j in range(0, samples, batch_size):
-                batch_indices = indices[j : j + batch_size]
-                x_batch = x_train[batch_indices]
-                y_batch = y_train[batch_indices]
-                err = 0
-                for k in range(len(x_batch)):
-                    output = x_batch[k]
-                    for layer in self.layers:
-                        output = layer.forward_propagation(output)
-                    err += self.loss(y_batch[k], output)
-                    grad = self.loss_grad(y_batch[k], output)
-                    for layer in reversed(self.layers):
-                        grad = layer.backward_propagation(grad, learning_rate)
-                err /= len(x_batch)
-            print("Epoch %d/%d - Error: %f" % (i + 1, epochs, err))
+        def fit_mini_batch(self, x_train, y_train, batch_size, epochs, learning_rate, lr_decay=0.99):
+    """
+    Mini-batch SGD training.
+    Compatible with the layer API: forward_propagation / backward_propagation.
+    A multiplicative learning-rate scheduler is used.
+    """
+
+    samples = len(x_train)
+
+    for epoch in range(epochs):
+
+        # Shuffle
+        indices = np.arange(samples)
+        np.random.shuffle(indices)
+
+        epoch_error = 0.0
+
+        # Loop over mini-batches
+        for j in range(0, samples, batch_size):
+            batch_indices = indices[j : j + batch_size]
+            x_batch = x_train[batch_indices]
+            y_batch = y_train[batch_indices]
+
+            batch_error = 0.0
+
+            # To approximate correct mini-batch behavior:
+            # scale learning rate by batch size
+            lr = learning_rate / len(x_batch)
+
+            # SGD inside the batch
+            for k in range(len(x_batch)):
+
+                # forward
+                output = x_batch[k]
+                for layer in self.layers:
+                    output = layer.forward_propagation(output)
+
+                # error
+                batch_error += self.loss(y_batch[k], output)
+
+                # backward update
+                grad = self.loss_grad(y_batch[k], output)
+                for layer in reversed(self.layers):
+                    grad = layer.backward_propagation(grad, lr)
+
+            batch_error /= len(x_batch)
+            epoch_error += batch_error
+
+        # Scheduler
+        learning_rate *= lr_decay
+
+        print(f"Epoch {epoch+1}/{epochs} - Error: {epoch_error:.4f} - lr: {learning_rate:.6f}")
 
     def prof(self, x_train, y_train, epochs=1, learning_rate=1):
         """
